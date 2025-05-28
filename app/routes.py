@@ -205,6 +205,7 @@ MQTT_BROKER = "192.168.222.191"   # Cambia si el broker está en otra IP
 MQTT_PORT = 1883
 MQTT_TOPIC_GRIDFS = "deteccion/personas"
 MQTT_TOPIC_TEMP = "iot/temperatura/prediccion"
+MQTT_TOPIC_HUM = "iot/humedad/prediccion"
 
 
 
@@ -272,6 +273,37 @@ def predecir_temperatura():
             }
 
             publicar_a_mqtt(resultado, MQTT_TOPIC_TEMP)
+            return jsonify(resultado)
+        else:
+            return jsonify({"error": "No se pudo entrenar el modelo"}), 500
+
+    except Exception as e:
+        return jsonify({"error": f"Error procesando la predicción: {str(e)}"}), 500
+
+
+@bp.route('/api/humedadP', methods=['GET'])
+def predecir_humedad():
+    db = get_db()
+
+    documentos = list(db.Humedad.find(
+        {"tipo": "humedad"},  # cambiar 'tipo' y 'temperatura' si usan otra forma de filtrar
+        {"valor": 1, "_id": 0}    # cambiar'valor' si se llama de otra forma
+    ))
+
+    if not documentos or len(documentos) < 3:
+        return jsonify({"error": "No hay suficientes datos"}), 400
+
+    try:
+        if entrenar_modelo(documentos):
+            pred = predecir_temperatura_futura(pasos=1)
+
+            resultado = {
+                "mensaje": "Predicción completada",
+                "prediccion_humedad": round(pred, 2),
+                "datos_utilizados": len(documentos)
+            }
+
+            publicar_a_mqtt(resultado, MQTT_TOPIC_HUM)
             return jsonify(resultado)
         else:
             return jsonify({"error": "No se pudo entrenar el modelo"}), 500
