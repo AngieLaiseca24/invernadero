@@ -15,13 +15,28 @@ bp = Blueprint('api', __name__)
 
 #Este endpoint es para guardar los datos de temperatura en la base de datos
 @bp.route('/api/sensores', methods=['POST'])
-def guardar_datos():
+def guardar_datos_sensores():
     data = request.get_json()
-    if not data or 'temperatura' not in data:
-        return jsonify({"error": "El campo 'temperatura' es obligatorio"}), 400
+
+    if not data:
+        return jsonify({"error": "Datos JSON faltantes"}), 400
+    
+    if 'temperatura' not in data and 'humedad' not in data:
+        return jsonify({"error": "Se requiere al menos 'temperatura' o 'humedad'"}), 400
+
+    data['timestamp'] = datetime.utcnow()
     db = get_db()
-    db.sensores.insert_one(data)
-    return jsonify({"mensaje": "Datos guardados"}), 201
+    db['sensores'].insert_one(data)
+
+    return jsonify({"mensaje": "Datos ambientales guardados"}), 201
+
+
+#Este endpoint es para extraer los datos guardados en la base de datos
+@bp.route('/api/sensores', methods=['GET'])
+def obtener_datos_sensores():
+    db = get_db()
+    datos = list(db['sensores'].find({}, {"_id": 0}))
+    return jsonify(datos)
 
 @bp.route('/api/imagenes', methods=['POST'])
 def guardar_imagen_esp32():
@@ -76,14 +91,6 @@ def guardar_imagen_esp32():
         
     except Exception as e:
         return jsonify({"error": f"Error interno del servidor: {str(e)}"}), 500
-
-#Este endpoint es para extraer los datos guardados en la base de datos
-@bp.route('/api/sensores', methods=['GET'])
-def obtener_datos():
-    db = get_db()
-    datos = list(db.sensores.find({}, {"_id": 0}))
-    return jsonify(datos)
-
 
 @bp.route('/api/imagenes/<string:file_id>', methods=['GET'])
 def obtener_imagen_gridfs(file_id):
