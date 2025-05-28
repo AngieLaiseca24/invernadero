@@ -23,6 +23,60 @@ def guardar_datos():
     db.sensores.insert_one(data)
     return jsonify({"mensaje": "Datos guardados"}), 201
 
+@bp.route('/api/imagenes', methods=['POST'])
+def guardar_imagen_esp32():
+    try:
+        data = request.get_json()
+        
+        # Validar que llegue la imagen en base64
+        if not data or 'imagen_base64' not in data:
+            return jsonify({"error": "El campo 'imagen_base64' es obligatorio"}), 400
+        
+        imagen_base64 = data['imagen_base64']
+        
+        # Decodificar base64 a bytes
+        try:
+            # Remover prefijo si existe (data:image/jpeg;base64,)
+            if ',' in imagen_base64:
+                imagen_base64 = imagen_base64.split(',')[1]
+            
+            imagen_bytes = base64.b64decode(imagen_base64)
+        except Exception as e:
+            return jsonify({"error": f"Error decodificando base64: {str(e)}"}), 400
+        
+        # Validar que sea una imagen válida
+        try:
+            imagen_pil = Image.open(io.BytesIO(imagen_bytes))
+            imagen_pil.verify()  # Verifica que sea una imagen válida
+        except Exception as e:
+            return jsonify({"error": f"Archivo no es una imagen válida: {str(e)}"}), 400
+        
+        # Guardar en GridFS
+        db = get_db()
+        fs = GridFS(db)
+        
+        # Metadatos básicos
+        metadata = {
+            'timestamp': datetime.utcnow(),
+            'source': 'esp32',
+            'content_type': 'image/jpeg'
+        }
+        
+        # Guardar imagen en GridFS
+        file_id = fs.put(
+            imagen_bytes,
+            filename=f"esp32_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.jpg",
+            metadata=metadata
+        )
+        
+        return jsonify({
+            "mensaje": "Imagen guardada exitosamente",
+            "file_id": str(file_id)
+        }), 201
+        
+    except Exception as e:
+        return jsonify({"error": f"Error interno del servidor: {str(e)}"}), 500
+
 #Este endpoint es para extraer los datos guardados en la base de datos
 @bp.route('/api/sensores', methods=['GET'])
 def obtener_datos():
@@ -31,29 +85,23 @@ def obtener_datos():
     return jsonify(datos)
 
 
-# este endpoint es para obtener la imagen desde la base de datos
-@bp.route('/api/sensores/<int:indice>', methods=['GET'])
-def obtener_imagen(indice):
-    db = get_db()
-    documentos = list(db.sensores.find({}))
-
-    if indice < 0 or indice >= len(documentos):
-        return jsonify({"error": "Índice fuera de rango"}), 404
-
-    doc = documentos[indice]
-    if "imagen" not in doc:
-        return jsonify({"error": "No se encontró la imagen"}), 404
-
-    imagen_binaria = doc["imagen"]
-
-    return send_file(
-        BytesIO(imagen_binaria),
-        mimetype='image/jpeg',  
-        as_attachment=False,
-        download_name=f"imagen_{indice}.jpg"
-    )
-
-
+@bp.route('/api/imagenes/<string:file_id>', methods=['GET'])
+def obtener_imagen_gridfs(file_id):
+    try:
+        db = get_db()
+        fs = GridFS(db)
+        
+        file = fs.get(ObjectId(file_id))
+        
+        return send_file(
+            BytesIO(file.read()),
+            mimetype='image/jpeg',
+            as_attachment=False,
+            download_name=f"imagen_{file_id}.jpg"
+        )
+        
+    except Exception as e:
+        return jsonify({"error": f"Error obteniendo imagen: {str(e)}"}), 404
 
 @bp.route('/api/objetos/<int:indice>', methods=['GET'])
 def detectar_objetos_en_base64(indice):
