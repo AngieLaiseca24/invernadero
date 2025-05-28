@@ -14,29 +14,104 @@ from io import BytesIO
 bp = Blueprint('api', __name__)
 
 #Este endpoint es para guardar los datos de temperatura en la base de datos
-@bp.route('/api/sensores', methods=['POST'])
-def guardar_datos_sensores():
+@bp.route('/api/temperatura', methods=['POST'])
+def guardar_datos_temperatura():
     data = request.get_json()
 
     if not data:
         return jsonify({"error": "Datos JSON faltantes"}), 400
     
-    if 'temperatura' not in data and 'humedad' not in data:
-        return jsonify({"error": "Se requiere al menos 'temperatura' o 'humedad'"}), 400
+    if 'temperatura' not in data:
+        return jsonify({"error": "Se requiere 'temperatura'"}), 400
 
     data['timestamp'] = datetime.utcnow()
     db = get_db()
-    db['sensores'].insert_one(data)
+    db['Temperatura'].insert_one(data)
 
     return jsonify({"mensaje": "Datos ambientales guardados"}), 201
 
 
-#Este endpoint es para extraer los datos guardados en la base de datos
-@bp.route('/api/sensores', methods=['GET'])
-def obtener_datos_sensores():
+#Este es para humedad, si se quiere guardar
+@bp.route('/api/humedad', methods=['POST'])
+def guardar_datos_humedad():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Datos JSON faltantes"}), 400
+    
+    if 'humedad' not in data:
+        return jsonify({"error": "Se requiere 'humedad'"}), 400
+
+    data['timestamp'] = datetime.utcnow()
     db = get_db()
-    datos = list(db['sensores'].find({}, {"_id": 0}))
+    db['Humedad'].insert_one(data)
+
+    return jsonify({"mensaje": "Datos ambientales guardados"}), 201
+
+#Este es para humedad, si se quiere guardar
+@bp.route('/api/nivelaguahorizontal', methods=['POST'])
+def guardar_datos_nivelaguahorizontal():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Datos JSON faltantes"}), 400
+    
+    if 'nivelaguahorizontal' not in data:
+        return jsonify({"error": "Se requiere 'nivel agua horizontal'"}), 400
+
+    data['timestamp'] = datetime.utcnow()
+    db = get_db()
+    db['NivelAguaHorizontal'].insert_one(data)
+
+    return jsonify({"mensaje": "Datos ambientales guardados"}), 201
+
+#Este es para humedad, si se quiere guardar
+@bp.route('/api/nivelaguavertical', methods=['POST'])
+def guardar_datos_nivelaguavertical():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Datos JSON faltantes"}), 400
+    
+    if 'nivelaguavertical' not in data:
+        return jsonify({"error": "Se requiere 'nivel agua vertical'"}), 400
+
+    data['timestamp'] = datetime.utcnow()
+    db = get_db()
+    db['NivelAguaVertical'].insert_one(data)
+
+    return jsonify({"mensaje": "Datos ambientales guardados"}), 201
+
+
+
+
+#Este endpoint es para extraer los datos guardados en la base de datos
+@bp.route('/api/humedad', methods=['GET'])
+def obtener_datos_humedad():
+    db = get_db()
+    datos = list(db['Humedad'].find({}, {"_id": 0}))
     return jsonify(datos)
+
+@bp.route('/api/temperatura', methods=['GET'])
+def obtener_datos_temperatura():
+    db = get_db()
+    datos = list(db['Temperatura'].find({}, {"_id": 0}))
+    return jsonify(datos)
+
+@bp.route('/api/nivelaguahorizontal', methods=['GET'])
+def obtener_datos_nivelaguahorizontal():
+    db = get_db()
+    datos = list(db['NivelAguaHorizontal'].find({}, {"_id": 0}))
+    return jsonify(datos)
+
+@bp.route('/api/nivelaguavertical', methods=['GET'])
+def obtener_datos_nivelaguavertical():
+    db = get_db()
+    datos = list(db['NivelAguaVertical'].find({}, {"_id": 0}))
+    return jsonify(datos)
+
+
+
 
 @bp.route('/api/imagenes', methods=['POST'])
 def guardar_imagen_esp32():
