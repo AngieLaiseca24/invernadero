@@ -10,6 +10,9 @@ import io
 import base64
 from datetime import datetime
 from io import BytesIO
+import paho.mqtt.client as mqtt
+import json
+
 
 bp = Blueprint('api', __name__)
 # Este endpoint es para guardar los datos de temperatura en la base de datos
@@ -196,41 +199,21 @@ def obtener_imagen_gridfs(file_id):
     except Exception as e:
         return jsonify({"error": f"Error obteniendo imagen: {str(e)}"}), 404
 
-@bp.route('/api/objetos/<int:indice>', methods=['GET'])
-def detectar_objetos_en_base64(indice):
-    db = get_db()
-    documentos = list(db.sensores.find({}))  # cambiar 'sensores' si el grupo usa otra colección
 
-    if indice < 0 or indice >= len(documentos):
-        return jsonify({"error": "Índice fuera de rango"}), 404
+# Configura tu broker y tópico
+MQTT_BROKER = "192.168.222.191"   # Cambia si el broker está en otra IP
+MQTT_PORT = 1883
+MQTT_TOPIC = "deteccion/personas"
 
-    doc = documentos[indice]
 
-    if "imagen_base64" not in doc:
-        return jsonify({"error": "No se encontró la imagen en base64"}), 404  # cambair'imagen_base64' si usan otro campo
-
+def publicar_a_mqtt(payload):
     try:
-        imagen_bytes = base64.b64decode(doc["imagen_base64"])
-        imagen = Image.open(io.BytesIO(imagen_bytes)).convert("RGB").resize((640, 640))  # cambiar el tamaño si YOLO necesita otro input :)
-        imagen_np = np.array(imagen)
-
-        objetos = detectar_objetos(imagen_np)
-
-        db.sensores.update_one({"_id": doc["_id"]}, {  # volver a cambiar 'sensores' si usan otra colección
-            "$set": {
-                "objetos_detectados": objetos,
-                "fecha_deteccion": datetime.utcnow()
-            }
-        })
-
-        return jsonify({
-            "mensaje": "Detección completada (base64)",
-            "objetos_detectados": objetos
-        })
-
+        client = mqtt.Client()
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        client.publish(MQTT_TOPIC, json.dumps(payload))
+        client.disconnect()
     except Exception as e:
-        return jsonify({"error": f"Error procesando la imagen: {str(e)}"}), 500
-
+        print(f"[MQTT] Error al publicar: {e}")
 
 
 @bp.route('/api/objetos/gridfs/<string:file_id>', methods=['GET'])
@@ -239,7 +222,7 @@ def detectar_objetos_en_gridfs(file_id):
     fs = GridFS(db)  
 
     try:
-        file = fs.get(ObjectId(file_id))  # cambiarr si el ID viene en otro formato o campo distinto
+        file = fs.get(ObjectId(file_id))
         imagen_bytes = file.read()
 
         imagen = Image.open(io.BytesIO(imagen_bytes)).convert("RGB").resize((640, 640))
@@ -247,10 +230,17 @@ def detectar_objetos_en_gridfs(file_id):
 
         objetos = detectar_objetos(imagen_np)
 
-        return jsonify({
+        resultado = {
             "mensaje": "Detección completada (GridFS)",
-            "objetos_detectados": objetos
-        })
+            "objetos_detectados": objetos,
+            "file_id": file_id,
+            "fecha_deteccion": datetime.utcnow().isoformat()
+        }
+
+        # Publicar el resultado a Mosquitto
+        publicar_a_mqtt(resultado)
+
+        return jsonify(resultado)
 
     except Exception as e:
         return jsonify({"error": f"Error leyendo desde GridFS: {str(e)}"}), 500
