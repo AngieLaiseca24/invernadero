@@ -12,26 +12,29 @@ from datetime import datetime
 from io import BytesIO
 
 bp = Blueprint('api', __name__)
-
-#Este endpoint es para guardar los datos de temperatura en la base de datos
+# Este endpoint es para guardar los datos de temperatura en la base de datos
 @bp.route('/api/temperatura', methods=['POST'])
 def guardar_datos_temperatura():
     data = request.get_json()
+    if not data or 'temperatura' not in data:
+        return jsonify({"error": "Se requiere el campo 'temperatura'"}), 400
 
-    if not data:
-        return jsonify({"error": "Datos JSON faltantes"}), 400
-    
-    if 'temperatura' not in data:
-        return jsonify({"error": "Se requiere 'temperatura'"}), 400
+    nuevo_dato = {
+        "tipo": "temperatura",
+        "valor": float(data['temperatura']),
+        "timestamp": datetime.utcnow()
+    }
 
-    data['timestamp'] = datetime.utcnow()
     db = get_db()
-    db['Temperatura'].insert_one(data)
+    result = db['Temperatura'].insert_one(nuevo_dato)
 
-    return jsonify({"mensaje": "Datos ambientales guardados"}), 201
+    # Convertir el _id de ObjectId a string antes de devolver la respuesta
+    nuevo_dato["_id"] = str(result.inserted_id)
+
+    return jsonify({"mensaje": "Dato de temperatura guardado", "dato": nuevo_dato}), 201
 
 
-#Este es para humedad, si se quiere guardar
+# Este es para humedad, si se quiere guardar
 @bp.route('/api/humedad', methods=['POST'])
 def guardar_datos_humedad():
     data = request.get_json()
@@ -44,11 +47,15 @@ def guardar_datos_humedad():
 
     data['timestamp'] = datetime.utcnow()
     db = get_db()
-    db['Humedad'].insert_one(data)
+    result = db['Humedad'].insert_one(data)
+    
+    # Convertir el _id de ObjectId a string antes de devolver la respuesta
+    data["_id"] = str(result.inserted_id)
 
-    return jsonify({"mensaje": "Datos ambientales guardados"}), 201
+    return jsonify({"mensaje": "Dato de humedad guardado", "dato": data}), 201
 
-#Este es para humedad, si se quiere guardar
+
+# Este es para nivel de agua horizontal
 @bp.route('/api/nivelaguahorizontal', methods=['POST'])
 def guardar_datos_nivelaguahorizontal():
     data = request.get_json()
@@ -61,11 +68,14 @@ def guardar_datos_nivelaguahorizontal():
 
     data['timestamp'] = datetime.utcnow()
     db = get_db()
-    db['NivelAguaHorizontal'].insert_one(data)
+    result = db['NivelAguaHorizontal'].insert_one(data)
+    # Convertir el _id de ObjectId a string antes de devolver la respuesta
+    data["_id"] = str(result.inserted_id)
 
-    return jsonify({"mensaje": "Datos ambientales guardados"}), 201
+    return jsonify({"mensaje": "Datos ambientales guardados", "dato": data}), 201
 
-#Este es para humedad, si se quiere guardar
+
+# Este es para nivel de agua vertical
 @bp.route('/api/nivelaguavertical', methods=['POST'])
 def guardar_datos_nivelaguavertical():
     data = request.get_json()
@@ -78,10 +88,11 @@ def guardar_datos_nivelaguavertical():
 
     data['timestamp'] = datetime.utcnow()
     db = get_db()
-    db['NivelAguaVertical'].insert_one(data)
+    result = db['NivelAguaVertical'].insert_one(data)
+    # Convertir el _id de ObjectId a string antes de devolver la respuesta
+    data["_id"] = str(result.inserted_id)
 
-    return jsonify({"mensaje": "Datos ambientales guardados"}), 201
-
+    return jsonify({"mensaje": "Datos ambientales guardados", "dato": data}), 201
 
 
 
@@ -246,11 +257,11 @@ def detectar_objetos_en_gridfs(file_id):
 
 
 
-@bp.route('/api/temperatura', methods=['GET'])
+@bp.route('/api/temperaturaP', methods=['GET'])
 def predecir_temperatura():
     db = get_db()
 
-    documentos = list(db.sensores.find(
+    documentos = list(db.Temperatura.find(
         {"tipo": "temperatura"},  # cambiar 'tipo' y 'temperatura' si usan otra forma de filtrar
         {"valor": 1, "_id": 0}    # cambiar'valor' si se llama de otra forma
     ))
