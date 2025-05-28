@@ -203,14 +203,16 @@ def obtener_imagen_gridfs(file_id):
 # Configura tu broker y tópico
 MQTT_BROKER = "192.168.222.191"   # Cambia si el broker está en otra IP
 MQTT_PORT = 1883
-MQTT_TOPIC = "deteccion/personas"
+MQTT_TOPIC_GRIDFS = "deteccion/personas"
+MQTT_TOPIC_TEMP = "iot/temperatura/prediccion"
 
 
-def publicar_a_mqtt(payload):
+
+def publicar_a_mqtt(payload,topic):
     try:
         client = mqtt.Client()
         client.connect(MQTT_BROKER, MQTT_PORT, 60)
-        client.publish(MQTT_TOPIC, json.dumps(payload))
+        client.publish(topic, json.dumps(payload))
         client.disconnect()
     except Exception as e:
         print(f"[MQTT] Error al publicar: {e}")
@@ -238,7 +240,7 @@ def detectar_objetos_en_gridfs(file_id):
         }
 
         # Publicar el resultado a Mosquitto
-        publicar_a_mqtt(resultado)
+        publicar_a_mqtt(resultado, MQTT_TOPIC_GRIDFS)
 
         return jsonify(resultado)
 
@@ -262,11 +264,15 @@ def predecir_temperatura():
     try:
         if entrenar_modelo(documentos):
             pred = predecir_temperatura_futura(pasos=1)
-            return jsonify({
+
+            resultado = {
                 "mensaje": "Predicción completada",
                 "prediccion_temperatura": round(pred, 2),
                 "datos_utilizados": len(documentos)
-            })
+            }
+
+            publicar_a_mqtt(resultado, MQTT_TOPIC_TEMP)
+            return jsonify(resultado)
         else:
             return jsonify({"error": "No se pudo entrenar el modelo"}), 500
 
