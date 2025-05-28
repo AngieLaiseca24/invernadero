@@ -13,6 +13,24 @@ from io import BytesIO
 
 bp = Blueprint('api', __name__)
 
+#Este endpoint es para guardar los datos de temperatura en la base de datos
+@bp.route('/api/sensores', methods=['POST'])
+def guardar_datos():
+    data = request.get_json()
+    if not data or 'temperatura' not in data:
+        return jsonify({"error": "El campo 'temperatura' es obligatorio"}), 400
+    db = get_db()
+    db.sensores.insert_one(data)
+    return jsonify({"mensaje": "Datos guardados"}), 201
+
+#Este endpoint es para extraer los datos guardados en la base de datos
+@bp.route('/api/sensores', methods=['GET'])
+def obtener_datos():
+    db = get_db()
+    datos = list(db.sensores.find({}, {"_id": 0}))
+    return jsonify(datos)
+
+
 # este endpoint es para obtener la imagen desde la base de datos
 @bp.route('/api/sensores/<int:indice>', methods=['GET'])
 def obtener_imagen(indice):
