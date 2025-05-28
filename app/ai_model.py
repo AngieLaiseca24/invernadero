@@ -4,17 +4,17 @@ from sklearn.linear_model import LinearRegression
 from ultralytics import YOLO
 import cv2
 
+modelo_yolo = YOLO("yolov8n.pt")
 
-modelo_yolo = YOLO("yolov8n.pt") 
+modelo_temp = None
+modelo_hum = None
 
-modelo = None  # Modelo pa predicción de temperatura
+# Variables para guardar el último índice entrenado
+ultimo_index_temp = 0
+ultimo_index_hum = 0
 
-def entrenar_modelo(datos):
-    """
-    Entrena un modelo de regresión lineal simple para predecir temperatura.
-    Espera una lista de diccionarios con clave 'valor'.
-    """
-    global modelo
+def entrenar_modelo(datos, tipo="temperatura"):
+    global modelo_temp, modelo_hum, ultimo_index_temp, ultimo_index_hum
     df = pd.DataFrame(datos)
 
     if df.shape[0] < 3:
@@ -22,24 +22,31 @@ def entrenar_modelo(datos):
 
     df['index'] = range(len(df))
     X = df[['index']]
-    y = df['valor']                      # Cambiar si el campo no es 'valor'
-    modelo = LinearRegression()
-    modelo.fit(X, y)
+    y = df['valor']
+
+    if tipo == "temperatura":
+        modelo_temp = LinearRegression()
+        modelo_temp.fit(X, y)
+        ultimo_index_temp = df['index'].iloc[-1]
+    elif tipo == "humedad":
+        modelo_hum = LinearRegression()
+        modelo_hum.fit(X, y)
+        ultimo_index_hum = df['index'].iloc[-1]
+    else:
+        return False
+
     return True
 
-def predecir_temperatura_futura(pasos=1):
-    """
-    Predice la temperatura futura usando el modelo entrenado.
-    """
-    if modelo is None:
-        return None
-    pred = modelo.predict(np.array([[modelo.n_features_in_ + pasos - 1]]))
-    return float(pred[0])
+def predecir_futuro(pasos=1, tipo="temperatura"):
+    if tipo == "temperatura" and modelo_temp is not None:
+        pred = modelo_temp.predict(np.array([[ultimo_index_temp + pasos]]))
+        return float(pred[0])
+    elif tipo == "humedad" and modelo_hum is not None:
+        pred = modelo_hum.predict(np.array([[ultimo_index_hum + pasos]]))
+        return float(pred[0])
+    return None
 
 def detectar_objetos(imagen_np):
-    """
-    Aplica YOLOv8 para detectar objetos en una imagen NumPy.
-    """
     imagen_bgr = cv2.cvtColor(imagen_np, cv2.COLOR_RGB2BGR)
     resultados = modelo_yolo(imagen_bgr)
 

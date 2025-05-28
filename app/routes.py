@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, send_file
 from bson.binary import Binary
 from bson import ObjectId
 from .db import get_db
-from .ai_model import entrenar_modelo, predecir_temperatura_futura, detectar_objetos
+from .ai_model import entrenar_modelo, predecir_futuro, detectar_objetos
 from PIL import Image
 from gridfs import GridFS
 import numpy as np
@@ -263,8 +263,9 @@ def predecir_temperatura():
         return jsonify({"error": "No hay suficientes datos"}), 400
 
     try:
-        if entrenar_modelo(documentos):
-            pred = predecir_temperatura_futura(pasos=1)
+        if entrenar_modelo(documentos, tipo="temperatura"):
+            pred = predecir_futuro(pasos=1, tipo="temperatura")
+
 
             resultado = {
                 "mensaje": "Predicción completada",
@@ -294,8 +295,9 @@ def predecir_humedad():
         return jsonify({"error": "No hay suficientes datos"}), 400
 
     try:
-        if entrenar_modelo(documentos):
-            pred = predecir_temperatura_futura(pasos=1)
+        if entrenar_modelo(documentos, tipo="humedad"):
+            pred = predecir_futuro(pasos=1, tipo="humedad")
+
 
             resultado = {
                 "mensaje": "Predicción completada",
@@ -303,7 +305,7 @@ def predecir_humedad():
                 "datos_utilizados": len(documentos)
             }
 
-            publicar_a_mqtt(resultado, MQTT_TOPIC_HUM)
+            publicar_a_mqtt(resultado, MQTT_TOPIC_TEMP)
             return jsonify(resultado)
         else:
             return jsonify({"error": "No se pudo entrenar el modelo"}), 500
