@@ -201,7 +201,7 @@ def obtener_imagen_gridfs(file_id):
 
 
 # Configura tu broker y tópico
-MQTT_BROKER = "192.168.222.191"   # Cambia si el broker está en otra IP
+MQTT_BROKER = "192.168.204.153"   # Cambia si el broker está en otra IP
 MQTT_PORT = 1883
 MQTT_TOPIC_GRIDFS = "deteccion/personas"
 MQTT_TOPIC_TEMP = "iot/temperatura/prediccion"
